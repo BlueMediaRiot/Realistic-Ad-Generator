@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProjectState, PromptTemplates } from '../types';
-import { 
-    Terminal, ChevronUp, ChevronDown, Settings, 
-    LayoutDashboard, Sparkles, FileText, Palette, 
-    Users, MapPin, ListVideo, LayoutGrid, 
+import {
+    Terminal, ChevronUp, ChevronDown, Settings,
+    LayoutDashboard, Sparkles, FileText, Palette,
+    Users, MapPin, ListVideo, LayoutGrid,
     ChevronLeft, ChevronRight, Key, Film, Video,
-    LayoutTemplate, Presentation
+    LayoutTemplate, Presentation, AlertTriangle, X
 } from 'lucide-react';
 import { Spinner, Button, TextArea, Select } from './UIComponents';
 
@@ -111,13 +111,20 @@ export const Layout: React.FC<Props> = ({ currentStep, onStepChange, children, g
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState<'global' | 'templates'>('global');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  
+  const [skippedApiKey, setSkippedApiKey] = useState(false);
+  const [showLimitedBanner, setShowLimitedBanner] = useState(false);
+
   // Template Editing State
   const [selectedTemplateKey, setSelectedTemplateKey] = useState<keyof PromptTemplates>('ideas');
   const [tempTemplateValue, setTempTemplateValue] = useState('');
 
   useEffect(() => {
     checkKey();
+    const skipped = localStorage.getItem('mediariot_skipped_api_key') === 'true';
+    if (skipped) {
+      setSkippedApiKey(true);
+      setShowLimitedBanner(true);
+    }
     const handleAuthError = (e: any) => {
       setHasKey(false);
       setErrorMessage(e.detail);
@@ -152,7 +159,16 @@ export const Layout: React.FC<Props> = ({ currentStep, onStepChange, children, g
         setErrorMessage('');
         await aistudio.openSelectKey();
         setHasKey(true);
+        localStorage.removeItem('mediariot_skipped_api_key');
+        setSkippedApiKey(false);
+        setShowLimitedBanner(false);
     }
+  };
+
+  const handleSkipApiKey = () => {
+    localStorage.setItem('mediariot_skipped_api_key', 'true');
+    setSkippedApiKey(true);
+    setShowLimitedBanner(true);
   };
 
   const handleSaveTemplate = () => {
@@ -185,7 +201,7 @@ export const Layout: React.FC<Props> = ({ currentStep, onStepChange, children, g
     return <div className="min-h-screen bg-neutral-950 flex items-center justify-center"><Spinner /></div>;
   }
 
-  if (!hasKey) {
+  if (!hasKey && !skippedApiKey) {
     return (
       <div className="min-h-screen bg-neutral-950 flex items-center justify-center p-4 font-['Poppins']">
         <div className="bg-neutral-900 p-12 rounded-2xl max-w-md w-full shadow-2xl text-center">
@@ -199,9 +215,21 @@ export const Layout: React.FC<Props> = ({ currentStep, onStepChange, children, g
                     {errorMessage}
                 </div>
             )}
-            <Button onClick={handleConnect} className="w-full py-4 text-lg shadow-xl shadow-blue-900/10">
+            <Button onClick={handleConnect} className="w-full py-4 text-lg shadow-xl shadow-blue-900/10 mb-3">
                 <Key size={20} className="inline mr-2" /> Connect API Key
             </Button>
+            <Button onClick={handleSkipApiKey} variant="secondary" className="w-full py-3 text-sm">
+                Continue Without API Key
+            </Button>
+            <div className="bg-yellow-900/20 border border-yellow-900/30 text-yellow-400 p-3 rounded-lg mt-6 text-xs text-left">
+                <div className="flex items-start gap-2">
+                    <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                    <div>
+                        <p className="font-bold mb-1">Limited Mode</p>
+                        <p className="text-yellow-500/80">Without an API key, AI generation features will be disabled. You can manually input and organize your project data.</p>
+                    </div>
+                </div>
+            </div>
              <p className="text-[10px] text-neutral-600 mt-6 uppercase tracking-wider">
                 Powered by Google Gemini Pro & Veo Models
             </p>
@@ -317,6 +345,34 @@ export const Layout: React.FC<Props> = ({ currentStep, onStepChange, children, g
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col h-screen overflow-hidden bg-neutral-950 relative">
           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none"></div>
+
+          {/* Limited Mode Banner */}
+          {showLimitedBanner && !hasKey && (
+              <div className="relative z-20 bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border-b border-yellow-900/50 print:hidden">
+                  <div className="flex items-center justify-between px-6 py-3">
+                      <div className="flex items-center gap-3">
+                          <AlertTriangle size={20} className="text-yellow-400 shrink-0" />
+                          <div>
+                              <p className="text-sm font-bold text-yellow-100">Limited Mode Active</p>
+                              <p className="text-xs text-yellow-400/80">AI generation features are disabled. Connect an API key to unlock full functionality.</p>
+                          </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                          <Button onClick={handleConnect} variant="accent" className="text-xs py-2 px-4">
+                              <Key size={14} className="inline mr-1" /> Connect API Key
+                          </Button>
+                          <button
+                              onClick={() => setShowLimitedBanner(false)}
+                              className="p-1.5 hover:bg-yellow-900/20 rounded text-yellow-400 hover:text-yellow-300 transition-colors"
+                              title="Hide banner"
+                          >
+                              <X size={16} />
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          )}
+
           <div className="flex-1 overflow-y-auto relative z-10 scroll-smooth">
                 {children}
           </div>
